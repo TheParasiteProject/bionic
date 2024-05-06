@@ -10,8 +10,6 @@
 
 #include "system_properties/prop_imitation_hooks.h"
 
-#define GMS_PERSIST "com.google.android.gms.persistent"
-#define GMS_UI "com.google.android.gms.ui"
 #define GMS_UNSTABLE "com.google.android.gms.unstable"
 
 #define PROP_SECURITY_PATCH "ro.build.version.security_patch"
@@ -106,9 +104,7 @@ const char* PropImitationHooks::onHookProp(const char *name) {
 const char* PropImitationHooks::hookProp(const char *name) {
   onHookProp(name);
   if (getprogname() == nullptr 
-    || (strcmp(getprogname(), GMS_UNSTABLE) != 0 
-    || strcmp(getprogname(), GMS_UI) != 0
-    || strcmp(getprogname(), GMS_PERSIST) != 0)) {
+    || (strcmp(getprogname(), GMS_UNSTABLE) != 0)) {
     return name;
   }
   PIH_LOG("hookProp: Found system property name: %s\n", name);
