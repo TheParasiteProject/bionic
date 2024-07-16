@@ -17,6 +17,16 @@
 #define PROP_FIRST_API_LEVEL "ro.product.first_api_level"
 #define PROP_PIH_FIRST_API_LEVEL "persist.sys.pihooks.api_level"
 
+#define PROP_MOD_DEVICE "mod_device"
+#define PROP_PIH_PRODUCT "persist.sys.pihooks.product"
+
+bool endswith(const char *s1, const char *s2) {
+  size_t n1 = strlen(s1);
+  size_t n2 = strlen(s2);
+  
+  return (n2 == 0) || (!(n1 < n2) && memcmp(s1 + n1 - n2, s2, n2) == 0);
+}
+
 void PropImitationHooks::OnFind(const char** name) {
   if (getprogname() == nullptr || strcmp(getprogname(), GMS_UNSTABLE) != 0) {
     return;
@@ -26,6 +36,8 @@ void PropImitationHooks::OnFind(const char** name) {
     *name = PROP_PIH_SECURITY_PATCH;
   } else if (strcmp(*name, PROP_FIRST_API_LEVEL) == 0) {
     *name = PROP_PIH_FIRST_API_LEVEL;
+  } else if (endswith(*name, PROP_MOD_DEVICE)) {
+    *name = PROP_PIH_PRODUCT;
   } else {
     return;
   }
