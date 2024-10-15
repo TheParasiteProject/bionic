@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2014, Intel Corporation
+Copyright (c) 2024, Intel Corporation
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -30,7 +30,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 #ifndef MEMMOVE
-# define MEMMOVE		memmove_generic
+# define MEMMOVE		memmove_avx2
 #endif
 
 #ifndef L
@@ -90,20 +90,21 @@ name:		\
 #define POP(REG)	pop REG;
 
 #define ENTRANCE	\
-    PUSH (%rbx);    \
-    CFI_PUSH (%rbx);
+	PUSH(%rbx);		\
+	CFI_PUSH (%rbx);
 #define RETURN_END	\
-    POP (%rbx);     \
-    CFI_POP (%rbx); \
-    ret
+	POP(%rbx);		\
+	CFI_POP (%rbx);	\
+	ret
 #define RETURN		RETURN_END;
 
-	.section .text.sse2,"ax",@progbits
-ENTRY (__memcpy_chk_generic)
+	.section .text.avx2,"ax",@progbits
+ENTRY (__memcpy_chk_avx2)
 	cmp	%rcx, %rdx
 	ja	__memcpy_chk_fail
 /* Fall through to memcpy/memmove. */
-END (__memcpy_chk_generic)
+END (__memcpy_chk_avx2)
+
 ENTRY (MEMMOVE)
 	ENTRANCE
 	mov	%rdi, %rax
@@ -167,54 +168,86 @@ L(mm_len_64_or_more_forward):
 	jmp	L(mm_return)
 
 L(mm_len_128_or_more_forward):
-/* Aligning the address of destination.  */
-/*  save first unaligned 64 bytes */
+	cmp	$256, %rdx
+	ja	L(mm_len_256_or_more_forward)
+
+/* Copy [0..256] and return.  */
 	movdqu	(%rsi), %xmm0
 	movdqu	16(%rsi), %xmm1
 	movdqu	32(%rsi), %xmm2
 	movdqu	48(%rsi), %xmm3
-
-	lea	64(%rdi), %r8
-	and	$-64, %r8  /* r8 now aligned to next 64 byte boundary */
-	sub	%rdi, %rsi /* rsi = src - dst = diff */
-
-	movdqu	(%r8, %rsi), %xmm4
-	movdqu	16(%r8, %rsi), %xmm5
-	movdqu	32(%r8, %rsi), %xmm6
-	movdqu	48(%r8, %rsi), %xmm7
-
+	movdqu	64(%rsi), %xmm4
+	movdqu	80(%rsi), %xmm5
+	movdqu	96(%rsi), %xmm6
+	movdqu	112(%rsi), %xmm7
+	movdqu	-128(%rsi, %rdx), %xmm8
+	movdqu	-112(%rsi, %rdx), %xmm9
+	movdqu	-96(%rsi, %rdx), %xmm10
+	movdqu	-80(%rsi, %rdx), %xmm11
+	movdqu	-64(%rsi, %rdx), %xmm12
+	movdqu	-48(%rsi, %rdx), %xmm13
+	movdqu	-32(%rsi, %rdx), %xmm14
+	movdqu	-16(%rsi, %rdx), %xmm15
 	movdqu	%xmm0, (%rdi)
 	movdqu	%xmm1, 16(%rdi)
 	movdqu	%xmm2, 32(%rdi)
 	movdqu	%xmm3, 48(%rdi)
-	movdqa	%xmm4, (%r8)
-	movaps	%xmm5, 16(%r8)
-	movaps	%xmm6, 32(%r8)
-	movaps	%xmm7, 48(%r8)
-	add	$64, %r8
+	movdqu	%xmm4, 64(%rdi)
+	movdqu	%xmm5, 80(%rdi)
+	movdqu	%xmm6, 96(%rdi)
+	movdqu	%xmm7, 112(%rdi)
+	movdqu	%xmm8, -128(%rdi, %rdx)
+	movdqu	%xmm9, -112(%rdi, %rdx)
+	movdqu	%xmm10, -96(%rdi, %rdx)
+	movdqu	%xmm11, -80(%rdi, %rdx)
+	movdqu	%xmm12, -64(%rdi, %rdx)
+	movdqu	%xmm13, -48(%rdi, %rdx)
+	movdqu	%xmm14, -32(%rdi, %rdx)
+	movdqu	%xmm15, -16(%rdi, %rdx)
+	jmp	L(mm_return)
+
+L(mm_len_256_or_more_forward):
+/* Aligning the address of destination.  */
+/*  save first unaligned 128 bytes */
+	vmovdqu	(%rsi), %ymm0
+	vmovdqu	32(%rsi), %ymm1
+	vmovdqu	64(%rsi), %ymm2
+	vmovdqu	96(%rsi), %ymm3
+
+	lea	128(%rdi), %r8
+	and	$-128, %r8  /* r8 now aligned to next 128 byte boundary */
+	sub	%rdi, %rsi  /* rsi = src - dst = diff */
+
+	vmovdqu	(%r8, %rsi), %ymm4
+	vmovdqu	32(%r8, %rsi), %ymm5
+	vmovdqu	64(%r8, %rsi), %ymm6
+	vmovdqu	96(%r8, %rsi), %ymm7
+
+	vmovdqu	%ymm0, (%rdi)
+	vmovdqu	%ymm1, 32(%rdi)
+	vmovdqu	%ymm2, 64(%rdi)
+	vmovdqu	%ymm3, 96(%rdi)
+	vmovdqa	%ymm4, (%r8)
+	vmovaps	%ymm5, 32(%r8)
+	vmovaps	%ymm6, 64(%r8)
+	vmovaps	%ymm7, 96(%r8)
+	add	$128, %r8
 
 	lea	(%rdi, %rdx), %rbx
-	and	$-64, %rbx
+	and	$-128, %rbx
 	cmp	%r8, %rbx
 	jbe	L(mm_copy_remaining_forward)
 
 	cmp	__x86_shared_cache_size_half(%rip), %rdx
+	jae	L(mm_overlapping_check_forward)
 
-	ja      L(mm_overlapping_check_forward)
-
-	.p2align 4
+		.p2align 4
 L(mm_main_loop_forward):
-
-	prefetcht0 128(%r8, %rsi)
-
-	movdqu	(%r8, %rsi), %xmm0
-	movdqu	16(%r8, %rsi), %xmm1
-	movdqu	32(%r8, %rsi), %xmm2
-	movdqu	48(%r8, %rsi), %xmm3
-	movdqa	%xmm0, (%r8)
-	movaps	%xmm1, 16(%r8)
-	movaps	%xmm2, 32(%r8)
-	movaps	%xmm3, 48(%r8)
+	prefetcht0	128(%r8, %rsi)
+	vmovdqu	(%r8, %rsi), %ymm0
+	vmovdqu	32(%r8, %rsi), %ymm1
+	vmovdqa	%ymm0, (%r8)
+	vmovaps	%ymm1, 32(%r8)
 	lea	64(%r8), %r8
 	cmp	%r8, %rbx
 	ja	L(mm_main_loop_forward)
@@ -227,9 +260,12 @@ L(mm_copy_remaining_forward):
 	Now we need to advance %r8. */
 	lea	(%r8, %rsi), %r9
 
-L(mm_remaining_0_64_bytes_forward):
+L(mm_remaining_0_128_bytes_forward):
+	cmp	$64, %rdx
+	ja	L(mm_remaining_65_128_bytes_forward)
 	cmp	$32, %rdx
 	ja	L(mm_remaining_33_64_bytes_forward)
+	vzeroupper
 	cmp	$16, %rdx
 	ja	L(mm_remaining_17_32_bytes_forward)
 	test	%rdx, %rdx
@@ -250,16 +286,23 @@ L(mm_remaining_0_64_bytes_forward):
 	movb	%bl, (%r8)
 	jmp	L(mm_return)
 
+L(mm_remaining_65_128_bytes_forward):
+	vmovdqu (%r9), %ymm0
+	vmovdqu 32(%r9), %ymm1
+	vmovdqu -64(%r9, %rdx), %ymm2
+	vmovdqu -32(%r9, %rdx), %ymm3
+	vmovdqu %ymm0, (%r8)
+	vmovdqu %ymm1, 32(%r8)
+	vmovdqu %ymm2, -64(%r8, %rdx)
+	vmovdqu %ymm3, -32(%r8, %rdx)
+	jmp L(mm_return_vzeroupper)
+
 L(mm_remaining_33_64_bytes_forward):
-	movdqu	(%r9), %xmm0
-	movdqu	16(%r9), %xmm1
-	movdqu	-32(%r9, %rdx), %xmm2
-	movdqu	-16(%r9, %rdx), %xmm3
-	movdqu	%xmm0, (%r8)
-	movdqu	%xmm1, 16(%r8)
-	movdqu	%xmm2, -32(%r8, %rdx)
-	movdqu	%xmm3, -16(%r8, %rdx)
-	jmp	L(mm_return)
+	vmovdqu (%r9), %ymm0
+	vmovdqu -32(%r9, %rdx), %ymm1
+	vmovdqu %ymm0, (%r8)
+	vmovdqu %ymm1, -32(%r8, %rdx)
+	jmp	L(mm_return_vzeroupper)
 
 L(mm_remaining_17_32_bytes_forward):
 	movdqu	(%r9), %xmm0
@@ -331,6 +374,7 @@ L(mm_len_9_16_bytes_forward):
 L(mm_recalc_len):
 /* Compute in %rdx how many bytes are left to copy after
 	the main loop stops.  */
+	vzeroupper
 	mov 	%rbx, %rdx
 	sub 	%rdi, %rdx
 /* The code for copying backwards.  */
@@ -390,57 +434,90 @@ L(mm_len_64_or_more_backward):
 	jmp	L(mm_return)
 
 L(mm_len_128_or_more_backward):
+	cmp	$256, %rdx
+	ja	L(mm_len_256_or_more_backward)
+
+/* Copy [0..256] and return.  */
+	movdqu	(%rsi), %xmm0
+	movdqu	16(%rsi), %xmm1
+	movdqu	32(%rsi), %xmm2
+	movdqu	48(%rsi), %xmm3
+	movdqu	64(%rsi), %xmm4
+	movdqu	80(%rsi), %xmm5
+	movdqu	96(%rsi), %xmm6
+	movdqu	112(%rsi), %xmm7
+	movdqu	-128(%rsi, %rdx), %xmm8
+	movdqu	-112(%rsi, %rdx), %xmm9
+	movdqu	-96(%rsi, %rdx), %xmm10
+	movdqu	-80(%rsi, %rdx), %xmm11
+	movdqu	-64(%rsi, %rdx), %xmm12
+	movdqu	-48(%rsi, %rdx), %xmm13
+	movdqu	-32(%rsi, %rdx), %xmm14
+	movdqu	-16(%rsi, %rdx), %xmm15
+	movdqu	%xmm0, (%rdi)
+	movdqu	%xmm1, 16(%rdi)
+	movdqu	%xmm2, 32(%rdi)
+	movdqu	%xmm3, 48(%rdi)
+	movdqu	%xmm4, 64(%rdi)
+	movdqu	%xmm5, 80(%rdi)
+	movdqu	%xmm6, 96(%rdi)
+	movdqu	%xmm7, 112(%rdi)
+	movdqu	%xmm8, -128(%rdi, %rdx)
+	movdqu	%xmm9, -112(%rdi, %rdx)
+	movdqu	%xmm10, -96(%rdi, %rdx)
+	movdqu	%xmm11, -80(%rdi, %rdx)
+	movdqu	%xmm12, -64(%rdi, %rdx)
+	movdqu	%xmm13, -48(%rdi, %rdx)
+	movdqu	%xmm14, -32(%rdi, %rdx)
+	movdqu	%xmm15, -16(%rdi, %rdx)
+	jmp	L(mm_return)
+
+L(mm_len_256_or_more_backward):
 /* Aligning the address of destination. We need to save
-	16 bits from the source in order not to overwrite them.  */
-	movdqu	-16(%rsi, %rdx), %xmm0
-	movdqu	-32(%rsi, %rdx), %xmm1
-	movdqu	-48(%rsi, %rdx), %xmm2
-	movdqu	-64(%rsi, %rdx), %xmm3
+	128 bytes from the source in order not to overwrite them.  */
+	vmovdqu	-32(%rsi, %rdx), %ymm0
+	vmovdqu	-64(%rsi, %rdx), %ymm1
+	vmovdqu	-96(%rsi, %rdx), %ymm2
+	vmovdqu	-128(%rsi, %rdx), %ymm3
 
 	lea	(%rdi, %rdx), %r9
-	and	$-64, %r9 /* r9 = aligned dst */
+	and	$-128, %r9 /* r9 = aligned dst */
 
 	mov	%rsi, %r8
 	sub	%rdi, %r8 /* r8 = src - dst, diff */
 
-	movdqu	-16(%r9, %r8), %xmm4
-	movdqu	-32(%r9, %r8), %xmm5
-	movdqu	-48(%r9, %r8), %xmm6
-	movdqu	-64(%r9, %r8), %xmm7
+	vmovdqu	-32(%r9, %r8), %ymm4
+	vmovdqu	-64(%r9, %r8), %ymm5
+	vmovdqu	-96(%r9, %r8), %ymm6
+	vmovdqu	-128(%r9, %r8), %ymm7
 
-	movdqu	%xmm0, -16(%rdi, %rdx)
-	movdqu	%xmm1, -32(%rdi, %rdx)
-	movdqu	%xmm2, -48(%rdi, %rdx)
-	movdqu	%xmm3, -64(%rdi, %rdx)
-	movdqa	%xmm4, -16(%r9)
-	movaps	%xmm5, -32(%r9)
-	movaps	%xmm6, -48(%r9)
-	movaps	%xmm7, -64(%r9)
-	lea	-64(%r9), %r9
+	vmovdqu	%ymm0, -32(%rdi, %rdx)
+	vmovdqu	%ymm1, -64(%rdi, %rdx)
+	vmovdqu	%ymm2, -96(%rdi, %rdx)
+	vmovdqu	%ymm3, -128(%rdi, %rdx)
+	vmovdqa	%ymm4, -32(%r9)
+	vmovdqa	%ymm5, -64(%r9)
+	vmovdqa	%ymm6, -96(%r9)
+	vmovdqa	%ymm7, -128(%r9)
+	lea	-128(%r9), %r9
 
-	lea	64(%rdi), %rbx
-	and	$-64, %rbx
+	lea	128(%rdi), %rbx
+	and	$-128, %rbx
 
 	cmp	%r9, %rbx
 	jae	L(mm_recalc_len)
 
 	cmp	__x86_shared_cache_size_half(%rip), %rdx
-
-	ja	L(mm_overlapping_check_backward)
+	jae	L(mm_overlapping_check_backward)
 
 	.p2align 4
 L(mm_main_loop_backward):
-
 	prefetcht0 -128(%r9, %r8)
 
-	movdqu	-64(%r9, %r8), %xmm0
-	movdqu	-48(%r9, %r8), %xmm1
-	movdqu	-32(%r9, %r8), %xmm2
-	movdqu	-16(%r9, %r8), %xmm3
-	movdqa	%xmm0, -64(%r9)
-	movaps	%xmm1, -48(%r9)
-	movaps	%xmm2, -32(%r9)
-	movaps	%xmm3, -16(%r9)
+	vmovdqu	-64(%r9, %r8), %ymm0
+	vmovdqu	-32(%r9, %r8), %ymm1
+	vmovdqa	%ymm0, -64(%r9)
+	vmovaps	%ymm1, -32(%r9)
 	lea	-64(%r9), %r9
 	cmp	%r9, %rbx
 	jb	L(mm_main_loop_backward)
@@ -489,6 +566,10 @@ L(mm_len_5_8_bytes_backward):
 L(mm_return):
 	RETURN
 
+L(mm_return_vzeroupper):
+	vzeroupper
+	RETURN
+
 /* Big length copy forward part.  */
 
 	.p2align 4
@@ -500,19 +581,19 @@ L(mm_overlapping_check_forward):
 	jbe	L(mm_main_loop_forward)
 
 L(mm_large_page_loop_forward):
-	movdqu	(%r8, %rsi), %xmm0
-	movdqu	16(%r8, %rsi), %xmm1
-	movdqu	32(%r8, %rsi), %xmm2
-	movdqu	48(%r8, %rsi), %xmm3
-	movntdq	%xmm0, (%r8)
-	movntdq	%xmm1, 16(%r8)
-	movntdq	%xmm2, 32(%r8)
-	movntdq	%xmm3, 48(%r8)
-	lea 	64(%r8), %r8
-	cmp	%r8, %rbx
-	ja	L(mm_large_page_loop_forward)
+	vmovdqu	  (%r8, %rsi), %ymm0
+	vmovdqu	  32(%r8, %rsi), %ymm1
+	vmovdqu	  64(%r8, %rsi), %ymm2
+	vmovdqu	  96(%r8, %rsi), %ymm3
+	vmovntdq  %ymm0, (%r8)
+	vmovntdq  %ymm1, 32(%r8)
+	vmovntdq  %ymm2, 64(%r8)
+	vmovntdq  %ymm3, 96(%r8)
+	lea 	  128(%r8), %r8
+	cmp	  %r8, %rbx
+	ja	  L(mm_large_page_loop_forward)
 	sfence
-	jmp	L(mm_copy_remaining_forward)
+	jmp	  L(mm_copy_remaining_forward)
 
 /* Big length copy backward part.  */
 	.p2align 4
@@ -525,23 +606,15 @@ L(mm_overlapping_check_backward):
 	jbe	L(mm_main_loop_backward)
 
 L(mm_large_page_loop_backward):
-	movdqu	-64(%r9, %r8), %xmm0
-	movdqu	-48(%r9, %r8), %xmm1
-	movdqu	-32(%r9, %r8), %xmm2
-	movdqu	-16(%r9, %r8), %xmm3
-	movntdq	%xmm0, -64(%r9)
-	movntdq	%xmm1, -48(%r9)
-	movntdq	%xmm2, -32(%r9)
-	movntdq	%xmm3, -16(%r9)
-	lea 	-64(%r9), %r9
-	cmp	%r9, %rbx
-	jb	L(mm_large_page_loop_backward)
+	vmovdqu	  -64(%r9, %r8), %ymm0
+	vmovdqu	  -32(%r9, %r8), %ymm1
+	vmovntdq  %ymm0, -64(%r9)
+	vmovntdq  %ymm1, -32(%r9)
+	lea 	  -64(%r9), %r9
+	cmp	  %r9, %rbx
+	jb	  L(mm_large_page_loop_backward)
 	sfence
-	jmp	L(mm_recalc_len)
+	jmp	  L(mm_recalc_len)
 
 END (MEMMOVE)
-
-#ifdef BIONIC_RUST_BAREMETAL
-ALIAS_SYMBOL(memcpy, MEMMOVE)
-#endif
 
