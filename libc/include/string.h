@@ -52,10 +52,8 @@ void* _Nullable memrchr(const void* _Nonnull __s, int __ch, size_t __n) __attrib
 int memcmp(const void* _Nonnull __lhs, const void* _Nonnull __rhs, size_t __n) __attribute_pure__;
 void* _Nonnull memcpy(void* _Nonnull, const void* _Nonnull, size_t);
 
-#if defined(__USE_GNU)
-#if __BIONIC_AVAILABILITY_GUARD(23)
+#if defined(__USE_GNU) && __BIONIC_AVAILABILITY_GUARD(23)
 void* _Nonnull mempcpy(void* _Nonnull __dst, const void* _Nonnull __src, size_t __n) __INTRODUCED_IN(23);
-#endif /* __BIONIC_AVAILABILITY_GUARD(23) */
 #endif
 
 void* _Nonnull memmove(void* _Nonnull __dst, const void* _Nonnull __src, size_t __n);
@@ -170,12 +168,10 @@ int strerror_r(int __errno_value, char* _Nonnull __buf, size_t __n);
  *
  * Returns a pointer to a string, or null for unknown errno values.
  *
- * Available since API level 35.
+ * Available since API level 35 when compiling with `_GNU_SOURCE`.
  */
-#if defined(__USE_GNU)
-#if __BIONIC_AVAILABILITY_GUARD(35)
+#if defined(__USE_GNU) && __BIONIC_AVAILABILITY_GUARD(35)
 const char* _Nullable strerrorname_np(int __errno_value) __INTRODUCED_IN(35);
-#endif /* __BIONIC_AVAILABILITY_GUARD(35) */
 #endif
 
 /**
@@ -184,6 +180,8 @@ const char* _Nullable strerrorname_np(int __errno_value) __INTRODUCED_IN(35);
  * does not localize, this is the same as strerror() on Android.
  *
  * Returns a pointer to a string.
+ *
+ * Available when compiling with `_GNU_SOURCE`.
  */
 #if defined(__USE_GNU)
 const char* _Nonnull strerrordesc_np(int __errno_value) __RENAME(strerror);
