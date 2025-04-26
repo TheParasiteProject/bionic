@@ -82,22 +82,13 @@ void* _Nullable memmem(const void* _Nonnull __haystack, size_t __haystack_size, 
 
 char* _Nullable strchr(const char* _Nonnull __s, int __ch) __attribute_pure__;
 char* _Nullable __strchr_chk(const char* _Nonnull __s, int __ch, size_t __n);
-#if defined(__USE_GNU)
+
+#if defined(__USE_GNU) && __BIONIC_AVAILABILITY_GUARD(24)
 #if defined(__cplusplus)
-
-#if __BIONIC_AVAILABILITY_GUARD(24)
 extern "C++" char* _Nonnull strchrnul(char* _Nonnull __s, int __ch) __RENAME(strchrnul) __attribute_pure__ __INTRODUCED_IN(24);
-#endif /* __BIONIC_AVAILABILITY_GUARD(24) */
-#if __BIONIC_AVAILABILITY_GUARD(24)
 extern "C++" const char* _Nonnull strchrnul(const char* _Nonnull __s, int __ch) __RENAME(strchrnul) __attribute_pure__ __INTRODUCED_IN(24);
-#endif /* __BIONIC_AVAILABILITY_GUARD(24) */
-
 #else
-
-#if __BIONIC_AVAILABILITY_GUARD(24)
 char* _Nonnull strchrnul(const char* _Nonnull __s, int __ch) __attribute_pure__ __INTRODUCED_IN(24);
-#endif /* __BIONIC_AVAILABILITY_GUARD(24) */
-
 #endif
 #endif
 
@@ -114,12 +105,7 @@ char* _Nonnull strcat(char* _Nonnull __dst, const char* _Nonnull __src);
 char* _Nullable strdup(const char* _Nonnull __s);
 
 char* _Nullable strstr(const char* _Nonnull __haystack, const char* _Nonnull __needle) __attribute_pure__;
-#if defined(__cplusplus)
-extern "C++" char* _Nullable strcasestr(char* _Nonnull, const char* _Nonnull) __RENAME(strcasestr) __attribute_pure__;
-extern "C++" const char* _Nullable strcasestr(const char* _Nonnull, const char* _Nonnull) __RENAME(strcasestr) __attribute_pure__;
-#else
 char* _Nullable strcasestr(const char* _Nonnull __haystack, const char* _Nonnull __needle) __attribute_pure__;
-#endif
 char* _Nullable strtok(char* _Nullable __s, const char* _Nonnull __delimiter);
 char* _Nullable strtok_r(char* _Nullable __s, const char* _Nonnull __delimiter, char* _Nonnull * _Nonnull __pos_ptr);
 
@@ -210,26 +196,16 @@ size_t strxfrm(char* __BIONIC_COMPLICATED_NULLNESS __dst, const char* _Nonnull _
 int strcoll_l(const char* _Nonnull __lhs, const char* _Nonnull __rhs, locale_t _Nonnull __l) __attribute_pure__;
 size_t strxfrm_l(char* __BIONIC_COMPLICATED_NULLNESS __dst, const char* _Nonnull __src, size_t __n, locale_t _Nonnull __l);
 
-#if defined(__USE_GNU) && !defined(basename)
 /*
  * glibc has a basename in <string.h> that's different to the POSIX one in <libgen.h>.
  * It doesn't modify its argument, and in C++ it's const-correct.
  */
+#if defined(__USE_GNU) && __BIONIC_AVAILABILITY_GUARD(23) && !defined(basename)
 #if defined(__cplusplus)
-
-#if __BIONIC_AVAILABILITY_GUARD(23)
 extern "C++" char* _Nonnull basename(char* _Nullable __path) __RENAME(__gnu_basename) __INTRODUCED_IN(23);
-#endif /* __BIONIC_AVAILABILITY_GUARD(23) */
-#if __BIONIC_AVAILABILITY_GUARD(23)
 extern "C++" const char* _Nonnull basename(const char* _Nonnull __path) __RENAME(__gnu_basename) __INTRODUCED_IN(23);
-#endif /* __BIONIC_AVAILABILITY_GUARD(23) */
-
 #else
-
-#if __BIONIC_AVAILABILITY_GUARD(23)
 char* _Nonnull basename(const char* _Nonnull __path) __RENAME(__gnu_basename) __INTRODUCED_IN(23);
-#endif /* __BIONIC_AVAILABILITY_GUARD(23) */
-
 #endif
 #endif
 
@@ -293,8 +269,26 @@ char* _Nullable strrchr(char* _Nonnull const s __pass_object_size, int c) __pref
 }
 
 /* Functions with no FORTIFY counterpart. */
+
 inline __always_inline
-char* _Nullable __bionic_strstr(const char* _Nonnull h, const char* _Nonnull n) { return strstr(h, n); }
+char* _Nullable __bionic_strcasestr(const char* _Nonnull h, const char* _Nonnull n) {
+    return strcasestr(h, n);
+}
+
+inline __always_inline
+const char* _Nullable strcasestr(const char* _Nonnull h, const char* _Nonnull n) __prefer_this_overload {
+    return __bionic_strcasestr(h, n);
+}
+
+inline __always_inline
+char* _Nullable strcasestr(char* _Nonnull h, const char* _Nonnull n) __prefer_this_overload {
+    return __bionic_strcasestr(h, n);
+}
+
+inline __always_inline
+char* _Nullable __bionic_strstr(const char* _Nonnull h, const char* _Nonnull n) {
+    return strstr(h, n);
+}
 
 inline __always_inline
 const char* _Nullable strstr(const char* _Nonnull h, const char* _Nonnull n) __prefer_this_overload {
