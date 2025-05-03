@@ -576,7 +576,6 @@ cc_library_static {
         "upstream-openbsd/lib/libc/stdlib/ldiv.c",
         "upstream-openbsd/lib/libc/stdlib/llabs.c",
         "upstream-openbsd/lib/libc/stdlib/lldiv.c",
-        "upstream-openbsd/lib/libc/stdlib/lsearch.c",
         "upstream-openbsd/lib/libc/stdlib/recallocarray.c",
         "upstream-openbsd/lib/libc/stdlib/remque.c",
         "upstream-openbsd/lib/libc/stdlib/setenv.c",
@@ -2798,6 +2797,7 @@ cc_genrule {
         "kernel/android/**/*.h",
         "execinfo/include/**/*.h",
         "b64/include/**/*.h",
+        "include/*.h",
 
         "NOTICE",
 
