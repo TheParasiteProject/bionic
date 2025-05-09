@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 The Android Open Source Project
+ * Copyright (C) 2025 The Android Open Source Project
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,27 +26,14 @@
  * SUCH DAMAGE.
  */
 
-#pragma once
+#include <utime.h>
 
-/**
- * @file utime.h
- * @brief Historical access/modification time functionality.
- */
+#include <fcntl.h>
+#include <sys/stat.h>
 
-#include <sys/cdefs.h>
-#include <sys/types.h>
-#include <linux/utime.h>
+int utime(const char* _Nonnull path, const struct utimbuf* _Nullable times) {
+  if (times == nullptr) return utimensat(AT_FDCWD, path, nullptr, 0);
 
-__BEGIN_DECLS
-
-/**
- * [utime(2)](https://man7.org/linux/man-pages/man2/utime.2.html) changes the access and
- * modification times of the given path. If `__times` is null, the current time is used.
- *
- * New code should prefer utimensat().
- *
- * Returns 0 on success and returns -1 and sets `errno` on failure.
- */
-int utime(const char* _Nonnull __path, const struct utimbuf* _Nullable __times);
-
-__END_DECLS
+  timespec ts[2] = { {.tv_sec = times->actime}, {.tv_sec = times->modtime} };
+  return utimensat(AT_FDCWD, path, ts, 0);
+}

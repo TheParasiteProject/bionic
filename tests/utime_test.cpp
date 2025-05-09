@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 The Android Open Source Project
+ * Copyright (C) 2025 The Android Open Source Project
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,27 +26,27 @@
  * SUCH DAMAGE.
  */
 
-#pragma once
+#include <gtest/gtest.h>
 
-/**
- * @file utime.h
- * @brief Historical access/modification time functionality.
- */
+#include <utime.h>
 
-#include <sys/cdefs.h>
-#include <sys/types.h>
-#include <linux/utime.h>
+#include <android-base/file.h>
 
-__BEGIN_DECLS
+TEST(utime, utime) {
+  TemporaryFile tf;
 
-/**
- * [utime(2)](https://man7.org/linux/man-pages/man2/utime.2.html) changes the access and
- * modification times of the given path. If `__times` is null, the current time is used.
- *
- * New code should prefer utimensat().
- *
- * Returns 0 on success and returns -1 and sets `errno` on failure.
- */
-int utime(const char* _Nonnull __path, const struct utimbuf* _Nullable __times);
+  utimbuf ut;
+  ut.actime = 123;
+  ut.modtime = 456;
+  ASSERT_EQ(0, utime(tf.path, &ut)) << strerror(errno);
 
-__END_DECLS
+  struct stat sb;
+  ASSERT_EQ(0, stat(tf.path, &sb));
+  ASSERT_EQ(ut.actime, static_cast<long>(sb.st_atime));
+  ASSERT_EQ(ut.modtime, static_cast<long>(sb.st_mtime));
+}
+
+TEST(utime, utime_null) {
+  TemporaryFile tf;
+  ASSERT_EQ(0, utime(tf.path, nullptr)) << strerror(errno);
+}
