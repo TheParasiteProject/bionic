@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 The Android Open Source Project
+ * Copyright (C) 2025 The Android Open Source Project
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,44 +26,27 @@
  * SUCH DAMAGE.
  */
 
-#pragma once
+#include <gtest/gtest.h>
 
-#if __riscv
+#include <utime.h>
 
-/**
- * @file sys/hwprobe.h
- * @brief RISC-V hardware probing.
- */
+#include <android-base/file.h>
 
-#include <sys/cdefs.h>
-#include <sys/types.h>
+TEST(utime, utime) {
+  TemporaryFile tf;
 
-/* For cpu_set_t. */
-#include <sched.h>
+  utimbuf ut;
+  ut.actime = 123;
+  ut.modtime = 456;
+  ASSERT_EQ(0, utime(tf.path, &ut)) << strerror(errno);
 
-/* Pull in struct riscv_hwprobe and corresponding constants. */
-#include <asm/hwprobe.h>
+  struct stat sb;
+  ASSERT_EQ(0, stat(tf.path, &sb));
+  ASSERT_EQ(ut.actime, static_cast<long>(sb.st_atime));
+  ASSERT_EQ(ut.modtime, static_cast<long>(sb.st_mtime));
+}
 
-__BEGIN_DECLS
-
-/**
- * [__riscv_hwprobe(2)](https://docs.kernel.org/riscv/hwprobe.html)
- * queries hardware characteristics.
- *
- * A `__cpu_set_size` of 0 and null `__cpu_set` means "all online cpus".
- *
- * Returns 0 on success and returns an error number on failure.
- */
-int __riscv_hwprobe(struct riscv_hwprobe* _Nonnull __pairs, size_t __pair_count, size_t __cpu_set_size, cpu_set_t* _Nullable __cpu_set, unsigned __flags);
-
-/**
- * The type of the second argument passed to riscv64 ifunc resolvers.
- * This argument allows riscv64 ifunc resolvers to call __riscv_hwprobe()
- * without worrying about whether that relocation is resolved before
- * the ifunc resolver is called.
- */
-typedef int (*__riscv_hwprobe_t)(struct riscv_hwprobe* _Nonnull __pairs, size_t __pair_count, size_t __cpu_set_size, cpu_set_t* _Nullable __cpu_set, unsigned __flags);
-
-__END_DECLS
-
-#endif
+TEST(utime, utime_null) {
+  TemporaryFile tf;
+  ASSERT_EQ(0, utime(tf.path, nullptr)) << strerror(errno);
+}
