@@ -58,6 +58,7 @@ cc_defaults {
         "-DUSE_SCUDO",
     ],
     asflags: libc_common_flags,
+    ldflags: ["-Wl,-O3"],
     conlyflags: ["-std=gnu99"],
     cppflags: [],
     include_dirs: [
