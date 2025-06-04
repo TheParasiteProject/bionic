@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022 The Android Open Source Project
+ * Copyright (C) 2025 The Android Open Source Project
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,7 +26,9 @@
  * SUCH DAMAGE.
  */
 
-#include <string.h>
-
-#define __BIONIC_MEMSET_EXPLICIT_INLINE /* Out of line. */
-#include <bits/memset_explicit_impl.h>
+__BIONIC_MEMSET_EXPLICIT_INLINE void* _Nonnull memset_explicit(void* _Nonnull __dst, int __ch, size_t __n) {
+  void* __result = memset(__dst, __ch, __n);
+  // https://bugs.llvm.org/show_bug.cgi?id=15495
+  __asm__ __volatile__("" : : "r"(__dst) : "memory");
+  return __result;
+}
