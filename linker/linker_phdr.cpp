@@ -31,6 +31,7 @@
 #include <errno.h>
 #include <string.h>
 #include <sys/mman.h>
+#include <sys/param.h>
 #include <sys/prctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -182,8 +183,8 @@ bool ElfReader::Read(const char* name, int fd, off64_t file_offset, off64_t file
     did_read_ = true;
   }
 
-  if (kPageSize == 16*1024 && min_align_ == 4096) {
-    // This prop needs to be read on 16KiB devices for each ELF where min_palign is 4KiB.
+  if (kPageSize == 16 * 1024 && min_align_ < kPageSize) {
+    // This prop needs to be read on 16KiB devices for each ELF where min_align_ is less than 16KiB.
     // It cannot be cached since the developer may toggle app compat on/off.
     // This check will be removed once app compat is made the default on 16KiB devices.
     should_use_16kib_app_compat_ =
@@ -552,7 +553,7 @@ bool ElfReader::CheckProgramHeaderAlignment() {
     // or a positive, integral power of two.
     // The kernel ignores loadable segments with other values,
     // so we just warn rather than reject them.
-    if ((phdr->p_align & (phdr->p_align - 1)) != 0) {
+    if (!powerof2(phdr->p_align)) {
       DL_WARN("\"%s\" has invalid p_align %zx in phdr %zu", name_.c_str(),
                      static_cast<size_t>(phdr->p_align), i);
       continue;
@@ -564,6 +565,8 @@ bool ElfReader::CheckProgramHeaderAlignment() {
       min_align_ = std::min(min_align_, static_cast<size_t>(phdr->p_align));
     }
   }
+
+  if (kPageSize == 16 * 1024) FixMinAlignFor16KiB();
 
   return true;
 }
