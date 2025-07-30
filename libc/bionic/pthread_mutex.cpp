@@ -811,7 +811,7 @@ static int __attribute__((noinline)) HandleUsingDestroyedMutex(pthread_mutex_t* 
 }
 
 int pthread_mutex_lock(pthread_mutex_t* mutex_interface) {
-#if !defined(__LP64__)
+#if 1
     // Some apps depend on being able to pass NULL as a mutex and get EINVAL
     // back. Don't need to worry about it for LP64 since the ABI is brand new,
     // but keep compatibility for LP32. http://b/19995172.
