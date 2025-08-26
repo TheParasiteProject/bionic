@@ -373,10 +373,6 @@ cc_library_static {
     defaults: ["libc_defaults"],
     srcs: [
         "upstream-freebsd/lib/libc/stdlib/getopt_long.c",
-        "upstream-freebsd/lib/libc/stdlib/hcreate.c",
-        "upstream-freebsd/lib/libc/stdlib/hcreate_r.c",
-        "upstream-freebsd/lib/libc/stdlib/hdestroy_r.c",
-        "upstream-freebsd/lib/libc/stdlib/hsearch_r.c",
         "upstream-freebsd/lib/libc/stdlib/quick_exit.c",
         "upstream-freebsd/lib/libc/string/wcsdup.c",
     ],
@@ -525,6 +521,7 @@ cc_library_static {
         "upstream-openbsd/lib/libc/string/strcasestr.c",
         "upstream-openbsd/lib/libc/string/strdup.c",
         "upstream-openbsd/lib/libc/string/strndup.c",
+        "upstream-openbsd/lib/libc/string/strtok.c",
 
         // These files are originally from OpenBSD,
         // and benefit from being compiled with openbsd-compat.h.
