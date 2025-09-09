@@ -57,6 +57,11 @@
 #include "private/__bionic_get_shell_path.h"
 #include "private/bionic_fortify.h"
 
+// Check a FILE* isn't nullptr, so we can emit a clear diagnostic message
+// instead of just crashing with SIGSEGV.
+#define CHECK_FP(fp) \
+  if (fp == nullptr) __fortify_fatal("%s: null FILE*", __FUNCTION__)
+
 #define	NDYNAMIC 10		/* add ten more whenever necessary */
 
 #define PRINTF_IMPL(expr) \
@@ -402,7 +407,9 @@ FILE* freopen(const char* file, const char* mode, FILE* fp) {
 }
 __strong_alias(freopen64, freopen);
 
-static int __FILE_close(FILE* fp) {
+int fclose(FILE* fp) {
+  CHECK_FP(fp);
+
   if (fp->_flags == 0) {
     // Already freed!
     errno = EBADF;
@@ -437,11 +444,7 @@ static int __FILE_close(FILE* fp) {
   fp->_flags = 0;
   return r;
 }
-
-int fclose(FILE* fp) {
-  CHECK_FP(fp);
-  return __FILE_close(fp);
-}
+__strong_alias(pclose, fclose);
 
 int fileno_unlocked(FILE* fp) {
   CHECK_FP(fp);
@@ -1251,11 +1254,6 @@ FILE* popen(const char* cmd, const char* mode) {
 
   _EXT(fp)->_popen_pid = pid;
   return fp;
-}
-
-int pclose(FILE* fp) {
-  CHECK_FP(fp);
-  return __FILE_close(fp);
 }
 
 void flockfile(FILE* fp) {
