@@ -110,6 +110,7 @@ _Static_assert(sizeof(struct __sFILE) == 84, "__sFILE changed size");
 /* minimal requirement of SUSv2 */
 #define WCIO_UNGETWC_BUFSIZE 1
 
+// TODO: this struct isn't useful on its own; inline directly into __sfileext.
 struct wchar_io_data {
   mbstate_t wcio_mbstate_in;
   mbstate_t wcio_mbstate_out;
@@ -117,7 +118,7 @@ struct wchar_io_data {
   wchar_t wcio_ungetwc_buf[WCIO_UNGETWC_BUFSIZE];
   size_t wcio_ungetwc_inbuf;
 
-  int wcio_mode; /* orientation */
+  int orientation;
 };
 
 struct __sfileext {
@@ -151,18 +152,15 @@ struct __sfileext {
 #define __SRW 0x0010   // Was opened for reading & writing.
 #define __SEOF 0x0020  // Found EOF.
 #define __SERR 0x0040  // Found error.
-#define __SMBF 0x0080  // `_buf` is from malloc.
+#define __SMBF 0x0080  // `_bf` is from malloc.
 // #define __SAPP 0x0100 --- historical (fdopen()ed in append mode).
 #define __SSTR 0x0200  // This is an sprintf/snprintf string.
 // #define __SOPT 0x0400 --- historical (do fseek() optimization).
 // #define __SNPT 0x0800 --- historical (do not do fseek() optimization).
 // #define __SOFF 0x1000 --- historical (set iff _offset is in fact correct).
-// #define __SMOD 0x2000 --- historical (set iff fgetln modified _p text).
+// #define __SMOD 0x2000 --- historical (set iff fgetln() returned _bf pointer).
 #define __SALC 0x4000  // Allocate string space dynamically.
 #define __SIGN 0x8000  // Ignore this file in _fwalk.
-
-// TODO: remove remaining references to this obsolete flag (see above).
-#define __SMOD 0
 
 #define _EXT(fp) __BIONIC_CAST(reinterpret_cast, struct __sfileext*, (fp)->_ext._base)
 
@@ -198,6 +196,9 @@ __LIBC32_LEGACY_PUBLIC__ int __swrite(void*, const char*, int);
 __LIBC32_LEGACY_PUBLIC__ fpos_t __sseek(void*, fpos_t, int);
 __LIBC32_LEGACY_PUBLIC__ int __sclose(void*);
 __LIBC32_LEGACY_PUBLIC__ int _fwalk(int (*)(FILE*));
+
+/* This was referenced by a couple of different pieces of middleware and the Crystax NDK. */
+__LIBC32_LEGACY_PUBLIC__ extern struct glue __sglue;
 
 off64_t __sseek64(void*, off64_t, int);
 int __sflush_locked(FILE*);
@@ -280,25 +281,25 @@ char* __hdtoa(double, const char*, int, int*, int*, char**);
 char* __hldtoa(long double, const char*, int, int*, int*, char**);
 char* __ldtoa(long double*, int, int, int*, int*, char**);
 
-#define WCIO_GET(fp) (_EXT(fp) ? &(_EXT(fp)->_wcio) : NULL)
+#define WCIO_GET(fp) (&(_EXT(fp)->_wcio))
 
 #define ORIENT_BYTES (-1)
 #define ORIENT_UNKNOWN 0
 #define ORIENT_CHARS 1
 
-#define _SET_ORIENTATION(fp, mode)                                              \
-  do {                                                                          \
-    struct wchar_io_data* _wcio = WCIO_GET(fp);                                 \
-    if (_wcio && _wcio->wcio_mode == ORIENT_UNKNOWN) _wcio->wcio_mode = (mode); \
+#define _SET_ORIENTATION(fp, mode) \
+  do { \
+    struct wchar_io_data* _wcio = WCIO_GET(fp); \
+    if (_wcio->orientation == ORIENT_UNKNOWN) { \
+      _wcio->orientation = (mode > 0) ? ORIENT_CHARS : ORIENT_BYTES; \
+     } \
   } while (0)
 
-#define WCIO_FREE(fp)                           \
-  do {                                          \
+#define WCIO_FREE(fp) \
+  do { \
     struct wchar_io_data* _wcio = WCIO_GET(fp); \
-    if (_wcio) {                                \
-      _wcio->wcio_mode = ORIENT_UNKNOWN;        \
-      _wcio->wcio_ungetwc_inbuf = 0;            \
-    }                                           \
+    _wcio->orientation = ORIENT_UNKNOWN; \
+    _wcio->wcio_ungetwc_inbuf = 0; \
   } while (0)
 
 __END_DECLS
